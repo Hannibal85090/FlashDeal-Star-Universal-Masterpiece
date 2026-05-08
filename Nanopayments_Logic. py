@@ -1,0 +1,31 @@
+"""
+FlashDeal Star — Nanopayments Engine (x402)
+Protocol-level micro-transactions.
+"""
+
+class NanopaymentProvider:
+    def __init__(self, chain="polygon"):
+        self.chain = chain
+        self.min_amount = 0.000001  # واحد من مليون من الدولار (ميكروسنت)
+
+    def execute_gasless_permit(self, amount, recipient):
+        """
+        تنفيذ عملية دفع بدون رسوم غاز (Gasless) باستخدام EIP-3009.
+        """
+        if amount < self.min_amount:
+            return {"status": "failed", "reason": "Amount below protocol limit"}
+        
+        # محاكاة التنفيذ عبر Circle API
+        tx_hash = f"0x{hash(str(amount) + recipient) & 0xffffffffffffffff:016x}"
+        return {
+            "status": "success",
+            "tx_hash": tx_hash,
+            "chain": self.chain,
+            "cost_to_user": 0.00,
+            "speed": "<500ms"
+        }
+
+# مثال للاستخدام
+nano = NanopaymentProvider(chain="polygon")
+print(nano.execute_gasless_permit(0.000005, "0xReceiver..."))
+
