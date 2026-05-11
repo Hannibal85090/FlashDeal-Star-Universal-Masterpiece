@@ -1,0 +1,31 @@
+import subprocess
+import sys
+import os
+
+def install_requirements():
+    base = ["-r", "requirements/base.txt"]
+    sign = ["-r", "requirements/sign_language.txt"]
+    
+    if not os.path.exists(base[1]):
+        print(f" ملف {base[1]} غير موجود!")
+        return
+    
+    print(" البدء في تثبيت الأساسيات...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install"] + base)
+    except subprocess.CalledProcessError as e:
+        print(f" حدث خطأ أثناء تثبيت الأساسيات: {e}")
+        return
+    
+    if "--with-sign" in sys.argv:
+        if not os.path.exists(sign[1]):
+            print(f" ملف {sign[1]} غير موجود!")
+            return
+        print(" جاري تثبيت محرك لغة الإشارة (قد يستغرق وقتاً)...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install"] + sign)
+        except subprocess.CalledProcessError as e:
+            print(f" حدث خطأ أثناء تثبيت محرك لغة الإشارة: {e}")
+
+if __name__ == "__main__":
+    install_requirements()
