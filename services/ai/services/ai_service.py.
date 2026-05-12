@@ -1,0 +1,95 @@
+import time
+import asyncio
+from transformers import pipeline
+import google.generativeai as genai
+from loguru import logger
+from cryptography.fernet import Fernet
+from twilio.rest import Client
+from core.config.settings import settings
+
+class AIService:
+    """
+    النسخة السيادية الذكية لـ FlashDeal Star.
+    تجمع بين المعالجة اللحظية، التعلم التكيفي، والإنذار المبكر.
+    """
+    def __init__(self):
+        self.settings = settings
+        self.history_scores = [] # سجل تاريخي لضبط العتبة تلقائياً
+        
+        # 1. إعداد الأنظمة الأمنية (تشفير السجلات)
+        self.fernet = Fernet(self.settings.ENCRYPTION_KEY)
+        
+        # 2. تحسين أداء تحليل المشاعر (استخدام GPU إن وجد)
+        device = "cuda" if getattr(self.settings, 'USE_GPU', False) else "cpu"
+        self.sentiment_analyzer = pipeline(
+            "sentiment-analysis", 
+            model="distilbert-base-uncased-finetuned-sst-2-english",
+            device=device
+        )
+        
+        # 3. إعداد السجلات (Audit & Backup)
+        logger.add("logs/audit.log", filter=lambda r: "user_id" in r["extra"])
+        logger.add("backup/audit_backup.log", rotation="1 day", retention="30 days")
+        
+        self._setup_clients()
+
+    def _setup_clients(self):
+        try:
+            genai.configure(api_key=self.settings.GOOGLE_API_KEY)
+            self.model = genai.GenerativeModel(self.settings.AI_MODEL)
+            self.alternative_model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # عميل Twilio للإشعارات الفورية
+            self.twilio_client = Client(self.settings.TWILIO_SID, self.settings.TWILIO_TOKEN)
+            logger.success("✅ تم تفعيل العصب الذكي لـ FlashDeal Star")
+        except Exception as e:
+            logger.error(f"❌ خطأ في تهيئة العملاء: {e}")
+
+    def _adaptive_threshold(self):
+        """نظام تعلم آلي لضبط عتبة الإنذار تلقائياً"""
+        if len(self.history_scores) < 10:
+            return 0.8 # القيمة الافتراضية
+        avg_score = sum(self.history_scores) / len(self.history_scores)
+        return avg_score + 0.2
+
+    async def process_sovereign_request(self, prompt: str, user_id: str):
+        """معالجة الطلب مع حماية تامة من تعطل النظام"""
+        with logger.contextualize(user_id=user_id):
+            start_time = time.time()
+            try:
+                # محاولة المعالجة بالنموذج الرئيسي مع Fallback
+                try:
+                    response = await self.model.generate_content_async(prompt)
+                except:
+                    logger.warning("⚠️ تحول للنموذج الاحتياطي")
+                    response = await self.alternative_model.generate_content_async(prompt)
+
+                # تحليل المشاعر التفصيلي والتعلم التكيفي
+                sentiment_results = self.sentiment_analyzer(response.text[:512], return_all_scores=True)
+                neg_score = next(s['score'] for s in sentiment_results[0] if s['label'] == 'NEGATIVE')
+                self.history_scores.append(neg_score)
+
+                # نظام الإنذار المبكر والتواصل مع CRM
+                if neg_score > self._adaptive_threshold():
+                    self._send_alert(user_id, neg_score)
+                
+                # تشفير سجل التدقيق للسيادة المعلوماتية
+                log_entry = f"ID:{user_id}|Score:{neg_score:.2f}|Status:DONE"
+                logger.info(f"AUDIT_ENC: {self.fernet.encrypt(log_entry.encode()).decode()[:15]}...")
+
+                return response.text
+
+            except Exception as e:
+                logger.error(f"🛑 وضع الحماية مفعل: تم احتواء خطأ: {e}")
+                return "النظام يعمل حالياً في وضع الحماية لتأمين عملياتك."
+
+    def _send_alert(self, user_id, score):
+        """إرسال إشعار فوري للمشرف"""
+        try:
+            self.twilio_client.messages.create(
+                body=f"🚨 إنذار سيادي: نشاط مريب من {user_id} (Score: {score:.2f})",
+                from_=self.settings.TWILIO_NUMBER,
+                to=self.settings.ADMIN_PHONE
+            )
+        except: pass
+
